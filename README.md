@@ -171,6 +171,9 @@ borders, so most hosts should prefer `'source'` or `'fit'`.
   understood are `parse-error`, never an empty success.
 - **Empty input.** A header with no nodes, or only comments, returns
   `reason: 'empty-diagram'`.
+- **Unsupported syntax.** `--o` / `--x` edges and trailing `%%` comments are
+  not rendering features; they return `parse-error` and fall back to the source
+  safely. Leading whole-line `%%` comments are ignored.
 - **Directions.** `BT` flips the finished canvas. `RL` reverses every edge and
   the node order, so the flow runs right-to-left while labels stay upright.
 - **No terminal detection.** The caller supplies the width and decides when to
