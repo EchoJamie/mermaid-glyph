@@ -15,6 +15,17 @@ describe('package contract', () => {
     expect(manifest.peerDependencies ?? {}).toEqual({})
   })
 
+  test('non-bun consumers resolve declarations from dist', () => {
+    const exports = (pkg as { exports: Record<string, unknown> }).exports
+    const root = exports['.'] as Record<string, unknown>
+    expect(root.types).toBe('./dist/index.d.ts')
+    expect(root.import).toBe('./dist/index.js')
+    expect(root.bun).toEqual({
+      types: './src/index.ts',
+      default: './src/index.ts',
+    })
+  })
+
   test('no source file imports a runtime package', () => {
     const offenders: string[] = []
 

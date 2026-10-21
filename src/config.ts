@@ -23,6 +23,7 @@ export type GlyphStatus = 'ok' | 'fallback' | 'truncated'
 export type GlyphReason =
   | 'parse-error'
   | 'unsupported-diagram'
+  | 'empty-diagram'
   | 'too-many-nodes'
   | 'too-wide'
   | 'unsupported-layout'

@@ -126,8 +126,9 @@ the renderer.
 ```ts
 interface GlyphResult {
   status: 'ok' | 'fallback' | 'truncated'
-  reason?: 'parse-error' | 'unsupported-diagram' | 'too-many-nodes'
-         | 'too-wide' | 'unsupported-layout' | 'internal-error'
+  reason?: 'parse-error' | 'unsupported-diagram' | 'empty-diagram'
+         | 'too-many-nodes' | 'too-wide' | 'unsupported-layout'
+         | 'internal-error'
   source: string
   lines: readonly GlyphLine[]
   width: number   // actual maximum display width
@@ -160,8 +161,18 @@ borders, so most hosts should prefer `'source'` or `'fit'`.
 - **Diagram scope.** `graph` / `flowchart` with `TD`, `TB`, `LR`, `BT`, `RL`.
   `stateDiagram`, `sequenceDiagram`, `classDiagram`, `erDiagram` and `xychart`
   are rejected with `reason: 'unsupported-diagram'`.
-- **Direction limitation.** `RL` is currently laid out like `LR` (the edge
-  arrows point right). `BT` is supported by flipping the finished canvas.
+- **Syntax.** Statements may be separated by newlines or semicolons, including
+  a header on the same line (`flowchart TD; A --> B`). Edge operators do not
+  need surrounding spaces (`A-->B`, `A-.->B`, `A---B`, `A==>B`,
+  `A-->|label|B`). A later shape-qualified declaration updates an existing
+  node (`B["乙"]`).
+- **Identifiers.** Node ids must be ASCII (letters, digits, `_`, and single
+  hyphens between segments). Non-ASCII ids and statements that cannot be
+  understood are `parse-error`, never an empty success.
+- **Empty input.** A header with no nodes, or only comments, returns
+  `reason: 'empty-diagram'`.
+- **Directions.** `BT` flips the finished canvas. `RL` reverses every edge and
+  the node order, so the flow runs right-to-left while labels stay upright.
 - **No terminal detection.** The caller supplies the width and decides when to
   call; the library never reads `process.stdout.columns`.
 - **Terminal support.** Labels are measured with `Intl.Segmenter` when the host

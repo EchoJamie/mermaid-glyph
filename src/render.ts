@@ -26,31 +26,20 @@ import {
   flipRoleCanvasVertically,
   getCanvasSize,
 } from './ascii/canvas.ts'
-import { parseMermaid } from './parser.ts'
+import { parseMermaid, splitStatements } from './parser.ts'
+import { GlyphParseError } from './errors.ts'
 import type { MermaidGraph, MermaidNode, MermaidSubgraph } from './types.ts'
 import { displayWidth, truncateToWidth, wrapToWidth } from './width.ts'
-
-/** Error raised when the source cannot be turned into a flowchart IR. */
-export class GlyphParseError extends Error {
-  readonly reason: GlyphReason
-
-  constructor(reason: GlyphReason, message: string) {
-    super(message)
-    this.name = 'GlyphParseError'
-    this.reason = reason
-  }
-}
 
 /** Parse only flowcharts. Other Mermaid diagram types are rejected explicitly
  * so the host can fall back to the source code block. */
 export function parseFlowchart(source: string): MermaidGraph {
-  const header =
-    source
-      .split('\n')
-      .map((line) => line.trim())
-      .find((line) => line !== '' && !line.startsWith('%%')) ?? ''
+  const statements = splitStatements(source)
+  if (statements.length === 0) {
+    throw new GlyphParseError('empty-diagram', 'mermaid diagram contains no statements')
+  }
 
-  if (header === '') throw new GlyphParseError('parse-error', 'empty mermaid diagram')
+  const header = statements[0] as string
 
   if (!/^(?:graph|flowchart)\s+(?:TD|TB|LR|BT|RL)\s*$/i.test(header)) {
     if (/^(?:stateDiagram|sequenceDiagram|classDiagram|erDiagram|xychart)\b/i.test(header)) {
@@ -160,17 +149,20 @@ function drawWith(
   labelWidth: number | null,
 ): Drawing {
   const prepared = labelWidth === null ? graph : wrapGraphLabels(graph, labelWidth)
+  // RL is LR with the arrows reversed: swap every edge and move the arrowhead
+  // to the other end. This keeps labels upright (a canvas mirror would reverse
+  // their text) while making the flow run right-to-left.
+  const oriented = prepared.direction === 'RL' ? reverseEdges(prepared) : prepared
 
   const asciiConfig: AsciiConfig = {
     useAscii: config.profile === 'ascii',
     paddingX: spacing.paddingX,
     paddingY: spacing.paddingY,
     boxBorderPadding: spacing.boxPadding,
-    graphDirection:
-      prepared.direction === 'LR' || prepared.direction === 'RL' ? 'LR' : 'TD',
+    graphDirection: oriented.direction === 'LR' ? 'LR' : 'TD',
   }
 
-  const asciiGraph = convertToAsciiGraph(prepared, asciiConfig)
+  const asciiGraph = convertToAsciiGraph(oriented, asciiConfig)
   createMapping(asciiGraph)
   if (!subgraphLayoutValid(asciiGraph)) throw new UnsupportedLayoutError('overlapping subgraphs')
   drawGraph(asciiGraph)
@@ -239,6 +231,22 @@ function compactSpacing(config: Normalized): Spacing {
     paddingX: Math.min(config.paddingX, 1),
     paddingY: Math.min(config.paddingY, 1),
     boxPadding: Math.min(config.boxPadding, 0),
+  }
+}
+
+function reverseEdges(graph: MermaidGraph): MermaidGraph {
+  return {
+    ...graph,
+    direction: 'LR',
+    // Mirror the reading direction for sibling roots and node indices.
+    nodes: new Map([...graph.nodes].reverse()),
+    edges: graph.edges.map((edge) => ({
+      ...edge,
+      source: edge.target,
+      target: edge.source,
+      hasArrowStart: edge.hasArrowEnd,
+      hasArrowEnd: edge.hasArrowStart,
+    })),
   }
 }
 

@@ -21,12 +21,22 @@ First usable release. Flowcharts only.
   original source instead of throwing.
 - Interleaved sibling subgraphs whose boxes would overlap are detected and
   returned as `unsupported-layout` instead of drawing missing labels.
+- Accept edge operators without spaces (`A-->B`, `A-.->B`, `A---B`,
+  `A==>B`, `A-->|label|B`).
+- Split statements on semicolons and accept a header on the same line
+  (`flowchart TD; A --> B`).
+- Let later shape-qualified declarations update existing node labels.
+- Reject non-ASCII node ids, unparseable statements and node-less diagrams
+  instead of returning an empty `ok` result.
+- Render `RL` right-to-left by reversing edges and node order; labels stay
+  upright.
+- Point non-bun `exports.types` at `dist/index.d.ts` so Node
+  `moduleResolution: nodenext` consumers can typecheck.
 - MIT license with beautiful-mermaid and mermaid-ascii notices.
 
 Known limitations:
 
 - Flowcharts (`graph` / `flowchart`) only. Other diagram types are rejected.
-- `RL` is laid out like `LR`; arrowheads point right.
 - Subgraphs work when their boxes do not overlap; interleaved siblings fall
   back to source.
 - No SVG output, terminal image protocols, interaction or horizontal scrolling.

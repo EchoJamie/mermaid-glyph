@@ -241,11 +241,12 @@ describe('limits and failures', () => {
   })
 
   test('invalid syntax falls back instead of throwing', () => {
-    for (const source of ['nonsense', 'flowchart SIDEWAYS\n  A --> B', '']) {
+    for (const source of ['nonsense', 'flowchart SIDEWAYS\n  A --> B']) {
       const result = renderMermaidGlyph(source, { width: 80 })
       expect(result.status).toBe('fallback')
       expect(result.reason).toBe('parse-error')
     }
+    expect(renderMermaidGlyph('', { width: 80 }).reason).toBe('empty-diagram')
   })
 
   test('a single trailing newline is dropped from fallback rows', () => {

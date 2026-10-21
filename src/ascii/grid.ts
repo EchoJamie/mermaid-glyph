@@ -394,18 +394,14 @@ export function createMapping(graph: AsciiGraph): void {
   const dir = graph.config.graphDirection
   const highestPositionPerLevel: number[] = new Array(100).fill(0)
 
-  // Identify root nodes — nodes that aren't the target of any edge
-  const nodesFound = new Set<string>()
-  const initialRoots: AsciiNode[] = []
-
-  for (const node of graph.nodes) {
-    if (!nodesFound.has(node.name)) {
-      initialRoots.push(node)
-    }
-    nodesFound.add(node.name)
-    for (const child of getChildren(graph, node)) {
-      nodesFound.add(child.name)
-    }
+  // Identify root nodes — nodes that aren't the target of any edge.
+  // Use the edge set rather than insertion order so declarations that appear
+  // after a reference still produce the right roots.
+  const targets = new Set(graph.edges.map((edge) => edge.to.name))
+  let initialRoots = graph.nodes.filter((node) => !targets.has(node.name))
+  if (initialRoots.length === 0 && graph.nodes.length > 0) {
+    // Every node is targeted (a cycle): start from the first one.
+    initialRoots = [graph.nodes[0]!]
   }
 
   // Filter out subgraph nodes that have incoming edges from external sources.

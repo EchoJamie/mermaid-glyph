@@ -1,4 +1,5 @@
 import type { MermaidGraph, MermaidNode, MermaidSubgraph, Direction, NodeShape, EdgeStyle } from './types.ts'
+import { GlyphParseError } from './errors.ts'
 import { normalizeBrTags } from './multiline-utils.ts'
 
 // ============================================================================
@@ -12,29 +13,87 @@ import { normalizeBrTags } from './multiline-utils.ts'
 // ============================================================================
 
 /**
+ * Split Mermaid source into statements.
+ *
+ * Semicolons separate statements on one line (`flowchart TD; A --> B`), and
+ * newlines separate them otherwise. Separators inside quotes, node brackets
+ * and edge-label pipes are kept as label text.
+ */
+export function splitStatements(source: string): string[] {
+  const out: string[] = []
+  let current = ''
+  let quote = false
+  let escaped = false
+  let depth = 0
+  let pipe = false
+
+  const push = (): void => {
+    const statement = current.trim()
+    if (statement !== '' && !statement.startsWith('%%')) out.push(statement)
+    current = ''
+  }
+
+  for (const char of source) {
+    if (escaped) {
+      current += char
+      escaped = false
+      continue
+    }
+    if (char === '\\') {
+      current += char
+      escaped = true
+      continue
+    }
+    if (char === '"') {
+      quote = !quote
+      current += char
+      continue
+    }
+
+    if (!quote) {
+      if (char === '[' || char === '(' || char === '{') depth += 1
+      else if (char === ']' || char === ')' || char === '}') depth = Math.max(0, depth - 1)
+      else if (char === '|' && depth === 0) pipe = !pipe
+
+      if ((char === ';' && !pipe) || (char === '\n' && depth === 0 && !pipe)) {
+        push()
+        continue
+      }
+    }
+
+    current += char
+  }
+
+  push()
+  return out
+}
+
+/**
  * Parse Mermaid text into a logical graph structure.
- * Auto-detects diagram type (flowchart or state diagram).
- * Throws on invalid/unsupported input.
+ * Throws GlyphParseError on invalid, unsupported or empty input.
  */
 export function parseMermaid(text: string): MermaidGraph {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const statements = splitStatements(text)
 
-  if (lines.length === 0) {
-    throw new Error('Empty mermaid diagram')
+  if (statements.length === 0) {
+    throw new GlyphParseError('empty-diagram', 'mermaid diagram contains no statements')
   }
 
   // Flowchart: "graph TD" or "flowchart LR"
-  return parseFlowchart(lines)
+  return parseFlowchart(statements)
 }
 
 // ============================================================================
 // Flowchart parser
 // ============================================================================
 
-function parseFlowchart(lines: string[]): MermaidGraph {
-  const headerMatch = lines[0]!.match(/^(?:graph|flowchart)\s+(TD|TB|LR|BT|RL)\s*$/i)
+function parseFlowchart(statements: string[]): MermaidGraph {
+  const headerMatch = statements[0]!.match(/^(?:graph|flowchart)\s+(TD|TB|LR|BT|RL)\s*$/i)
   if (!headerMatch) {
-    throw new Error(`Invalid mermaid header: "${lines[0]}". Expected "graph TD" or "flowchart LR"`)
+    throw new GlyphParseError(
+      'parse-error',
+      `Invalid mermaid header: "${statements[0]}". Expected "graph TD" or "flowchart LR"`,
+    )
   }
 
   const direction = headerMatch[1]!.toUpperCase() as Direction
@@ -53,8 +112,8 @@ function parseFlowchart(lines: string[]): MermaidGraph {
   // Subgraph stack for nested subgraphs.
   const subgraphStack: MermaidSubgraph[] = []
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]!
+  for (let i = 1; i < statements.length; i++) {
+    const line = statements[i]!
 
     // --- classDef: `classDef name prop:val,prop:val` ---
     const classDefMatch = line.match(/^classDef\s+(\w+)\s+(.+)$/)
@@ -119,7 +178,7 @@ function parseFlowchart(lines: string[]): MermaidGraph {
       const rest = subgraphMatch[1]!.trim()
       // Check for "subgraph id [Label]" form
       // ID can contain hyphens (e.g. "us-east"), so use [\w-]+ not \w+
-      const bracketMatch = rest.match(/^([\w-]+)\s*\[(.+)\]$/)
+      const bracketMatch = rest.match(/^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\s*\[(.+)\]$/)
       let id: string
       let label: string
       if (bracketMatch) {
@@ -150,6 +209,10 @@ function parseFlowchart(lines: string[]): MermaidGraph {
 
     // --- Edge/node definitions ---
     parseEdgeLine(line, graph, subgraphStack)
+  }
+
+  if (graph.nodes.size === 0) {
+    throw new GlyphParseError('empty-diagram', 'mermaid diagram contains no nodes')
   }
 
   return graph
@@ -211,32 +274,32 @@ const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.\->|-\.\-|==>|==
  */
 const NODE_PATTERNS: Array<{ regex: RegExp; shape: NodeShape }> = [
   // Triple delimiters (must be first)
-  { regex: /^([\w-]+)\(\(\((.+?)\)\)\)/, shape: 'doublecircle' },  // A(((text)))
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\(\(\((.+?)\)\)\)/, shape: 'doublecircle' },  // A(((text)))
 
   // Double delimiters with mixed brackets
-  { regex: /^([\w-]+)\(\[(.+?)\]\)/,     shape: 'stadium' },       // A([text])
-  { regex: /^([\w-]+)\(\((.+?)\)\)/,     shape: 'circle' },        // A((text))
-  { regex: /^([\w-]+)\[\[(.+?)\]\]/,     shape: 'subroutine' },    // A[[text]]
-  { regex: /^([\w-]+)\[\((.+?)\)\]/,     shape: 'cylinder' },      // A[(text)]
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\(\[(.+?)\]\)/,     shape: 'stadium' },       // A([text])
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\(\((.+?)\)\)/,     shape: 'circle' },        // A((text))
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\[\[(.+?)\]\]/,     shape: 'subroutine' },    // A[[text]]
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\[\((.+?)\)\]/,     shape: 'cylinder' },      // A[(text)]
 
   // Trapezoid variants — must come before plain [text]
-  { regex: /^([\w-]+)\[\/(.+?)\\\]/,     shape: 'trapezoid' },     // A[/text\]
-  { regex: /^([\w-]+)\[\\(.+?)\/\]/,     shape: 'trapezoid-alt' }, // A[\text/]
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\[\/(.+?)\\\]/,     shape: 'trapezoid' },     // A[/text\]
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\[\\(.+?)\/\]/,     shape: 'trapezoid-alt' }, // A[\text/]
 
   // Asymmetric flag shape
-  { regex: /^([\w-]+)>(.+?)\]/,          shape: 'asymmetric' },    // A>text]
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)>(.+?)\]/,          shape: 'asymmetric' },    // A>text]
 
   // Double curly braces (hexagon) — must come before single {text}
-  { regex: /^([\w-]+)\{\{(.+?)\}\}/,     shape: 'hexagon' },       // A{{text}}
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\{\{(.+?)\}\}/,     shape: 'hexagon' },       // A{{text}}
 
   // Single-char delimiters (last — most common, least specific)
-  { regex: /^([\w-]+)\[(.+?)\]/,         shape: 'rectangle' },     // A[text]
-  { regex: /^([\w-]+)\((.+?)\)/,         shape: 'rounded' },       // A(text)
-  { regex: /^([\w-]+)\{(.+?)\}/,         shape: 'diamond' },       // A{text}
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\[(.+?)\]/,         shape: 'rectangle' },     // A[text]
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\((.+?)\)/,         shape: 'rounded' },       // A(text)
+  { regex: /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)\{(.+?)\}/,         shape: 'diamond' },       // A{text}
 ]
 
 /** Regex for a bare node reference (just an ID, no shape brackets) */
-const BARE_NODE_REGEX = /^([\w-]+)/
+const BARE_NODE_REGEX = /^([A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*)/
 
 /** Regex for ::: class shorthand suffix — matches :::className immediately after a node */
 const CLASS_SHORTHAND_REGEX = /^:::([\w][\w-]*)/
@@ -255,7 +318,9 @@ function parseEdgeLine(
 
   // Parse the first node group (possibly with & separators)
   const firstGroup = consumeNodeGroup(remaining, graph, subgraphStack)
-  if (!firstGroup || firstGroup.ids.length === 0) return
+  if (!firstGroup || firstGroup.ids.length === 0) {
+    throw new GlyphParseError('parse-error', `Unrecognised statement: "${line}"`)
+  }
 
   remaining = firstGroup.remaining.trim()
   let prevGroupIds = firstGroup.ids
@@ -292,7 +357,9 @@ function parseEdgeLine(
 
     // Parse the next node group
     const nextGroup = consumeNodeGroup(remaining, graph, subgraphStack)
-    if (!nextGroup || nextGroup.ids.length === 0) break
+    if (!nextGroup || nextGroup.ids.length === 0) {
+      throw new GlyphParseError('parse-error', `Missing edge target in: "${line}"`)
+    }
 
     remaining = nextGroup.remaining.trim()
 
@@ -311,6 +378,10 @@ function parseEdgeLine(
     }
 
     prevGroupIds = nextGroup.ids
+  }
+
+  if (remaining.length > 0) {
+    throw new GlyphParseError('parse-error', `Unrecognised statement: "${line}"`)
   }
 }
 
@@ -371,7 +442,7 @@ function consumeNode(
     if (match) {
       id = match[1]!
       const label = normalizeBrTags(match[2]!)
-      registerNode(graph, subgraphStack, { id, label, shape })
+      registerNode(graph, subgraphStack, { id, label, shape }, true)
       remaining = text.slice(match[0].length)
       break
     }
@@ -385,7 +456,7 @@ function consumeNode(
     if (bareMatch) {
       id = bareMatch[1]!
       if (!graph.nodes.has(id)) {
-        registerNode(graph, subgraphStack, { id, label: id, shape: 'rectangle' })
+        registerNode(graph, subgraphStack, { id, label: id, shape: 'rectangle' }, false)
       }
       remaining = text.slice(bareMatch[0].length)
     }
@@ -407,11 +478,16 @@ function consumeNode(
 function registerNode(
   graph: MermaidGraph,
   subgraphStack: MermaidSubgraph[],
-  node: MermaidNode
+  node: MermaidNode,
+  explicit: boolean
 ): void {
-  const isNew = !graph.nodes.has(node.id)
-  if (isNew) {
+  const existing = graph.nodes.get(node.id)
+  if (existing === undefined) {
     graph.nodes.set(node.id, node)
+  } else if (explicit) {
+    // A later shape-qualified declaration updates the node. Bare references
+    // (explicit === false) never overwrite an existing label.
+    graph.nodes.set(node.id, { ...existing, label: node.label, shape: node.shape })
   }
   trackInSubgraph(subgraphStack, node.id)
 }
