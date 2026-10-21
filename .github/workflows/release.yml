@@ -13,6 +13,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout
@@ -30,7 +33,7 @@ jobs:
 
       - name: Update npm
         run: |
-          npm install -g npm@latest
+          npm install -g npm@11
           npm --version
 
       - name: Install dependencies
@@ -83,6 +86,12 @@ jobs:
 
       - name: Remove npm auth token config
         run: npm config delete '//registry.npmjs.org/:_authToken' || true
+
+      - name: Diagnose OIDC and npm auth
+        run: |
+          echo "OIDC_URL_SET=${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+          echo "OIDC_TOKEN_SET=${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+yes}"
+          npm config list
 
       - name: Publish to npm
         if: steps.published.outputs.exists != 'true'
