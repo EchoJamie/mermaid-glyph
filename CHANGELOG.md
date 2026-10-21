@@ -19,11 +19,15 @@ First usable release. Flowcharts only.
 - `unicode`, `cjk` and `ascii` frame profiles.
 - Parse failures, unsupported diagram types and internal errors degrade to the
   original source instead of throwing.
+- Interleaved sibling subgraphs whose boxes would overlap are detected and
+  returned as `unsupported-layout` instead of drawing missing labels.
 - MIT license with beautiful-mermaid and mermaid-ascii notices.
 
 Known limitations:
 
 - Flowcharts (`graph` / `flowchart`) only. Other diagram types are rejected.
 - `RL` is laid out like `LR`; arrowheads point right.
+- Subgraphs work when their boxes do not overlap; interleaved siblings fall
+  back to source.
 - No SVG output, terminal image protocols, interaction or horizontal scrolling.
 - Not published to npm.

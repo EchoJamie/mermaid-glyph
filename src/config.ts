@@ -25,6 +25,7 @@ export type GlyphReason =
   | 'unsupported-diagram'
   | 'too-many-nodes'
   | 'too-wide'
+  | 'unsupported-layout'
   | 'internal-error'
 
 export interface GlyphOptions {

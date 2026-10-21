@@ -127,7 +127,7 @@ the renderer.
 interface GlyphResult {
   status: 'ok' | 'fallback' | 'truncated'
   reason?: 'parse-error' | 'unsupported-diagram' | 'too-many-nodes'
-         | 'too-wide' | 'internal-error'
+         | 'too-wide' | 'unsupported-layout' | 'internal-error'
   source: string
   lines: readonly GlyphLine[]
   width: number   // actual maximum display width
@@ -153,6 +153,10 @@ borders, so most hosts should prefer `'source'` or `'fit'`.
   edge and subgraph labels at progressively smaller widths. If nothing fits, it
   falls back to the source.
 - **Node limit.** Checked before layout; the default is 50 nodes.
+- **Subgraphs.** Simple sibling and nested subgraphs render. If sibling
+  subgraphs interleave across layers, the upstream spacing pass can invert or
+  overlap their boxes; the renderer detects that and falls back with
+  `reason: 'unsupported-layout'` rather than printing missing labels.
 - **Diagram scope.** `graph` / `flowchart` with `TD`, `TB`, `LR`, `BT`, `RL`.
   `stateDiagram`, `sequenceDiagram`, `classDiagram`, `erDiagram` and `xychart`
   are rejected with `reason: 'unsupported-diagram'`.

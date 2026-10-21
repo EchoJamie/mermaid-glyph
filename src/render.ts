@@ -17,7 +17,7 @@ import {
   DEFAULT_PADDING_X,
   DEFAULT_PADDING_Y,
 } from './config.ts'
-import type { AsciiConfig, Canvas, RoleCanvas } from './ascii/types.ts'
+import type { AsciiConfig, AsciiSubgraph, Canvas, RoleCanvas } from './ascii/types.ts'
 import { convertToAsciiGraph } from './ascii/converter.ts'
 import { createMapping } from './ascii/grid.ts'
 import { drawGraph } from './ascii/draw.ts'
@@ -127,10 +127,17 @@ function renderWith(graph: MermaidGraph, source: string, config: Normalized): Gl
         return fallback(source, 'too-wide', config)
       }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof UnsupportedLayoutError) {
+      return fallback(source, 'unsupported-layout', config)
+    }
     return fallback(source, 'internal-error', config)
   }
 }
+
+/** Raised when the grid layout produces overlapping or inverted subgraph
+ * boxes. Drawing it would produce a visibly broken diagram. */
+class UnsupportedLayoutError extends Error {}
 
 // ══ Layout ═══════════════════════════════════════════════════════════════
 
@@ -165,6 +172,7 @@ function drawWith(
 
   const asciiGraph = convertToAsciiGraph(prepared, asciiConfig)
   createMapping(asciiGraph)
+  if (!subgraphLayoutValid(asciiGraph)) throw new UnsupportedLayoutError('overlapping subgraphs')
   drawGraph(asciiGraph)
 
   if (prepared.direction === 'BT') {
@@ -177,6 +185,45 @@ function drawWith(
   for (const line of lines) width = Math.max(width, displayWidth(line.text))
 
   return { lines, width, height: lines.length }
+}
+
+/**
+ * Sibling subgraph boxes must be valid rectangles and must not overlap.
+ * The upstream spacing pass can invert boxes when subgraphs interleave across
+ * layers; refusing the layout is better than printing missing labels and
+ * merged borders.
+ */
+function subgraphLayoutValid(graph: { subgraphs: readonly AsciiSubgraph[] }): boolean {
+  const groups = new Map<AsciiSubgraph | null, AsciiSubgraph[]>()
+
+  for (const sg of graph.subgraphs) {
+    if (sg.nodes.length === 0) continue
+    if (sg.maxX < sg.minX || sg.maxY < sg.minY) return false
+
+    if (sg.parent !== null) {
+      const parent = sg.parent
+      if (sg.minX < parent.minX || sg.maxX > parent.maxX) return false
+      if (sg.minY < parent.minY || sg.maxY > parent.maxY) return false
+    }
+
+    const siblings = groups.get(sg.parent)
+    if (siblings === undefined) groups.set(sg.parent, [sg])
+    else siblings.push(sg)
+  }
+
+  for (const siblings of groups.values()) {
+    for (let i = 0; i < siblings.length; i += 1) {
+      for (let j = i + 1; j < siblings.length; j += 1) {
+        const a = siblings[i] as AsciiSubgraph
+        const b = siblings[j] as AsciiSubgraph
+        const overlapsX = a.minX < b.maxX && b.minX < a.maxX
+        const overlapsY = a.minY < b.maxY && b.minY < a.maxY
+        if (overlapsX && overlapsY) return false
+      }
+    }
+  }
+
+  return true
 }
 
 function baseSpacing(config: Normalized): Spacing {

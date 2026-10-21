@@ -1,0 +1,28 @@
+flowchart LR
+  subgraph 客户端
+    U[用户] --> W[Web 前端]
+    M[移动端] --> W
+  end
+  subgraph 接入层
+    G[API 网关] --> A[认证服务]
+    G --> R[限流服务]
+  end
+  subgraph 服务层
+    S1[用户服务] --> DB1[(用户库)]
+    S2[订单服务] --> DB2[(订单库)]
+    S3[通知服务] --> Q[消息队列]
+    S4[搜索服务] --> ES[(搜索索引)]
+  end
+  subgraph 支撑
+    Q --> WK1[邮件工人]
+    Q --> WK2[推送工人]
+    C[定时任务] --> DB1
+    C --> DB2
+    O[监控] --> S1
+    O --> S2
+  end
+  W --> G
+  A --> S1
+  A --> S2
+  R --> S3
+  G --> S4

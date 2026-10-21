@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import stringWidth from 'string-width'
 import {
   GlyphParseError,
@@ -81,6 +83,60 @@ describe('acceptance scenes', () => {
       // An independent ruler agrees with the canvas cell model.
       expect(displayWidth(line.text)).toBe(stringWidth(line.text))
     }
+  })
+
+  test('200 columns: a realistic 18-node architecture renders whole', () => {
+    const source = readFileSync(
+      join(import.meta.dir, 'fixtures', 'architecture.mmd'),
+      'utf8',
+    )
+    const result = renderMermaidGlyph(source, { width: 200 })
+
+    expect(result.status).toBe('ok')
+    expect(result.width).toBeLessThanOrEqual(200)
+    for (const label of [
+      '用户', 'Web 前端', 'API 网关', '认证服务', '限流服务',
+      '用户服务', '订单服务', '通知服务', '搜索服务',
+      '用户库', '订单库', '消息队列', '搜索索引',
+      '邮件工人', '推送工人', '定时任务', '监控',
+    ]) {
+      expect(result.text).toContain(label)
+    }
+
+    // The same architecture also survives a 100-column budget with `fit`.
+    const narrow = renderMermaidGlyph(source, { width: 100, overflow: 'fit' })
+    expect(narrow.status).toBe('ok')
+    expectWithinWidth(narrow.lines.map((line) => line.text), 100)
+  })
+
+  test('simple stacked subgraphs keep their labels', () => {
+    const source = `flowchart TD
+  subgraph 前端
+    A[页面] --> B[状态]
+  end
+  subgraph 后端
+    C[接口] --> D[(数据库)]
+  end
+  B --> C`
+    const result = renderMermaidGlyph(source, { width: 80 })
+
+    expect(result.status).toBe('ok')
+    expect(result.text).toContain('前端')
+    expect(result.text).toContain('后端')
+    expect(result.text).toContain('页面')
+    expect(result.text).toContain('数据库')
+  })
+
+  test('interleaved sibling subgraphs fall back instead of drawing a broken box', () => {
+    const source = readFileSync(
+      join(import.meta.dir, 'fixtures', 'overlapping-subgraphs.mmd'),
+      'utf8',
+    )
+    const result = renderMermaidGlyph(source, { width: 200 })
+
+    expect(result.status).toBe('fallback')
+    expect(result.reason).toBe('unsupported-layout')
+    expect(result.text).toBe(source.replace(/\n$/, ''))
   })
 
   test('200 columns: a 20-node architecture is not truncated or elided', () => {
