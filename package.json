@@ -1,0 +1,55 @@
+{
+  "name": "mermaid-glyph",
+  "version": "0.1.0",
+  "description": "Render Mermaid flowcharts as width-aware terminal character art. Zero runtime dependencies.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "bun": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "src/",
+    "dist/",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "check": "bun run typecheck && bun test",
+    "prepublishOnly": "bun run check && bun run build"
+  },
+  "keywords": [
+    "mermaid",
+    "flowchart",
+    "diagram",
+    "ascii",
+    "terminal",
+    "cjk"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EchoJamie/mermaid-glyph.git"
+  },
+  "homepage": "https://github.com/EchoJamie/mermaid-glyph",
+  "bugs": {
+    "url": "https://github.com/EchoJamie/mermaid-glyph/issues"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "string-width": "^8.3.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.0"
+  }
+}
