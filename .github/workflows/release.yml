@@ -77,8 +77,6 @@ jobs:
             echo "exists=false" >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: Stage npm release
+      - name: Publish to npm
         if: steps.published.outputs.exists != 'true'
-        run: npm stage publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance

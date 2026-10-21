@@ -13,21 +13,27 @@ to the host.
   palette. Plain text by default.
 - **Zero runtime dependencies.** TypeScript, ESM, MIT.
 
-> Status: **0.1.0**, flowcharts only. Not published to npm yet. The repository
-> is the distribution: use a git or local-path dependency.
+> Status: **0.1.1**, flowcharts only. Published on npm as `mermaid-glyph`.
 
 ## Install
 
-Not on npm yet. Use the repository directly:
+```sh
+npm install mermaid-glyph
+# or
+bun add mermaid-glyph
+```
+
+To work from source instead:
 
 ```sh
-bun add github:EchoJamie/mermaid-glyph
-# or, for a checkout next to your project:
+# a checkout next to your project
 bun add link:../mermaid-glyph
+# or the repository directly
+bun add github:EchoJamie/mermaid-glyph
 ```
 
 Bun resolves the TypeScript source through the package's `bun` export. Other
-runtimes should consume the built ESM (`bun run build` → `dist/`).
+runtimes consume the built ESM (`bun run build` → `dist/`).
 
 ## Usage
 

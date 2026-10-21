@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1 — 2026-10-21
+
+Documentation and release metadata only; no runtime behavior changes.
+
+- Published to npm as `mermaid-glyph`, installable with
+  `npm install mermaid-glyph` or `bun add mermaid-glyph`.
+- Releases use npm Trusted Publishing (OIDC); no `NPM_TOKEN` secret.
+
 ## 0.1.0 — 2026-10-21
 
 First usable release. Flowcharts only.

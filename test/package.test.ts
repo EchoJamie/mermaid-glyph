@@ -8,7 +8,7 @@ const root = join(import.meta.dir, '..')
 describe('package contract', () => {
   test('name, version, license and zero runtime dependencies', () => {
     expect(pkg.name).toBe('mermaid-glyph')
-    expect(pkg.version).toBe('0.1.0')
+    expect(pkg.version).toBe('0.1.1')
     expect(pkg.license).toBe('MIT')
     const manifest = pkg as Record<string, unknown>
     expect(manifest.dependencies ?? {}).toEqual({})
