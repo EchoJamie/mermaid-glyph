@@ -84,17 +84,13 @@ jobs:
             echo "exists=false" >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: Remove npm auth token config
-        run: npm config delete '//registry.npmjs.org/:_authToken' || true
-
-      - name: Diagnose OIDC and npm auth
-        run: |
-          echo "OIDC_URL_SET=${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
-          echo "OIDC_TOKEN_SET=${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+yes}"
-          npm config list
+      - name: Configure npm auth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm config set '//registry.npmjs.org/:_authToken' "${NODE_AUTH_TOKEN}"
 
       - name: Stage npm release
         if: steps.published.outputs.exists != 'true'
         run: npm stage publish --access public --provenance
         env:
-          NPM_CONFIG_LOGLEVEL: silly
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
