@@ -93,6 +93,8 @@ jobs:
           echo "OIDC_TOKEN_SET=${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+yes}"
           npm config list
 
-      - name: Publish to npm
+      - name: Stage npm release
         if: steps.published.outputs.exists != 'true'
-        run: npm publish --access public --provenance
+        run: npm stage publish --access public --provenance
+        env:
+          NPM_CONFIG_LOGLEVEL: silly
